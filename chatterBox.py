@@ -70,6 +70,11 @@ class thing1:
     self.busIn.connect("message", self.busIn_on_message)
 # busIn will need to have synch messaging enabled in order to make 
 # xvimagesink (aka sinkIn) fit into the GUI's drawingarea
+#self.fingers.cross()
+    self.busIn.enable_sync_message_emission()
+    self.busIn.connect("message", self.busIn_on_message)
+    self.busIn.connect("sync-message::element", self.on_sync_message)
+
 
 # ---- playerOut pipeline -----------------------
 
@@ -105,8 +110,8 @@ class thing1:
 # also found in 'snappy's
 
 # (replace this with the nicer version)
-# see: configurePipeOutbound() (not ready yet)
-# and  configurePipeInbound() (nonexistant yet)
+# see: configurePipeOutbound() 
+# and  configurePipeInbound() 
 #    self.player = gst.parse_launch ("audiotestsrc ! alsasink")
 #    self.player = gst.parse_launch ("v4l2src ! video/x-raw-yuv,width=320,height=240 ! ffmpegcolorspace ! theoraenc ! oggmux ! tcpclientsink host=192.168.1.101 port=3000" )
 #    ! alsasink")
@@ -256,8 +261,10 @@ class thing1:
       if message_name == "prepare-xwindow-id":
           # Assign the viewport
           imagesink = message.src
+          print "message.src = ", imagesink
           imagesink.set_property("force-aspect-ratio", True)
-          imagesink.set_xwindow_id(self.movie_window.window.xid)
+          z = self.builder.get_object('drawingarea1')
+          imagesink.set_xwindow_id(z.window.xid)
           #but it ain't no "self.movie_window" - plug right critter in here
 #-------------------------------------
   def startPolling(self, widget):
@@ -285,6 +292,11 @@ class thing1:
           return False
 #-----------------------------------
   def quit(self, widget):
+      self.playerOut.set_state(gst.STATE_NULL)
+      print "playerOutState = NULL"
+      self.playerIn.set_state(gst.STATE_NULL)
+      print "playerINState = NULL"
+      
       sys.exit(0)
 
 Alice = chatter()  #local participant
