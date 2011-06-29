@@ -52,18 +52,41 @@ class thing1:
 
 # desired pipeline is as follows:
 # gst-launch-0.10 tcpserversrc host=192.168.1.142 port=5000 ! decodebin ! xvimagesink
+# gst-launch-0.10 udpsrc port=5000 ! smokedec ! autovideosink
+
 # where host and port point to IP and port of Alice
 # and xvimagesink gets stuffed into the gtkDrawingArea (later)
 
 # ---- playerIn pipeline ----------------------
+# make to this:
+# gst-launch-0.10 udpsrc port=5000 ! smokedec ! autovideosink
+
     self.playerIn = gst.Pipeline("playerIn")
-    self.sourceIn = gst.element_factory_make("tcpserversrc", "sourceIn")
-    self.dcb = gst.element_factory_make("decodebin", "dcb")
-    self.dcb.connect("new-decoded-pad", self.new_decode_pad)
+#    self.sourceIn = gst.element_factory_make("tcpserversrc", "sourceIn")
+    self.sourceIn = gst.element_factory_make("udpsrc", "sourceIn")
+    self.dc = gst.element_factory_make("smokedec", "dc")
+#    self.dcb = gst.element_factory_make("decodebin", "dcb")
+#    self.dcb.connect("new-decoded-pad", self.new_decode_pad)
     self.sinkIn = gst.element_factory_make("xvimagesink", "sinkIn")
 
-    self.playerIn.add(self.sourceIn, self.dcb, self.sinkIn)
-    gst.element_link_many(self.sourceIn, self.dcb)
+    self.playerIn.add(self.sourceIn, self.dc, self.sinkIn)
+    gst.element_link_many(self.sourceIn, self.dc, self.sinkIn)
+
+#------
+#    self.playerIn = gst.Pipeline("playerIn")
+#    self.sourceIn = gst.element_factory_make("tcpserversrc", "sourceIn")
+#    self.dcb = gst.element_factory_make("decodebin", "dcb")
+#    self.dcb.connect("new-decoded-pad", self.new_decode_pad)
+#    self.sinkIn = gst.element_factory_make("xvimagesink", "sinkIn")
+
+#    self.playerIn.add(self.sourceIn, self.dcb, self.sinkIn)
+#    gst.element_link_many(self.sourceIn, self.dcb)
+
+#-----
+
+
+
+
 
     self.busIn = self.playerIn.get_bus()
     self.busIn.add_signal_watch()
@@ -78,32 +101,68 @@ class thing1:
 
 # ---- playerOut pipeline -----------------------
 
-#gst-launch-0.10 v4l2src ! video/x-raw-yuv,width=320,height=240 ! theoraenc ! oggmux ! tcpclientsink host=127.0.0.1 port = 9000
+#gst-launch-0.10 v4l2src ! video/x-raw-yuv,width=320,height=240 ! 
+# theoraenc ! oggmux ! tcpclientsink host=127.0.0.1 port = 9000
+
+#modify to be:
+#gst-launch-0.10 v4l2src ! video/x-raw-yuv,width=320,height=240,
+# framerate=\(fraction\)15/1 ! ffmpegcolorspace ! 
+# smokeenc keyframe=8 qmax=40 ! udpsink host=127.0.0.1 port=5000
+
+
+#---------------------------------
     self.playerOut = gst.Pipeline("playerOut")
     self.sourceOut = gst.element_factory_make("v4l2src", "camsrc")
-    self.caps = gst.Caps("video/x-raw-yuv,width=320,height=240")
+    self.caps = gst.Caps("video/x-raw-yuv,width=320,height=240, framerate=15/1")
+    #framerate=\(fraction\)15/1
       #^^ subject to later change^^
-
     self.filterOut = gst.element_factory_make("capsfilter", "filter")
     self.filterOut.set_property("caps", self.caps)
       #^^ note: assuming this is dynamic,and that changing caps    ^^
       #^^ properties later will propogate -- check this assumption ^^
 
-    self.theoEnc = gst.element_factory_make("theoraenc", "theoenc")
-    self.oggmuxer = gst.element_factory_make("oggmux", "oggmuxer")
+    self.smokeEnc = gst.element_factory_make("smokeenc", "smokeEnc")
 
-    self.sinkOut = gst.element_factory_make("tcpclientsink", "sinkOut")
+    self.sinkOut = gst.element_factory_make("udpsink", "sinkOut")
       # this should be a UDP port, but... patience grasshopper
 
     self.conv = gst.element_factory_make ("ffmpegcolorspace", "conv")
-    self.playerOut.add(self.sourceOut, self.filterOut, self.theoEnc, 
-                       self.oggmuxer, self.sinkOut)
+    self.playerOut.add(self.sourceOut, self.filterOut, self.conv, self.smokeEnc, 
+                       self.sinkOut)
     gst.element_link_many(self.sourceOut, self.filterOut, 
-                          self.theoEnc, self.oggmuxer, self.sinkOut)
+                          self.conv, self.smokeEnc, self.sinkOut)
 
     self.busOut = self.playerOut.get_bus()
     self.busOut.add_signal_watch()
     self.busOut.connect("message", self.busOut_on_message)
+
+
+#----------------------safbak version
+#    self.playerOut = gst.Pipeline("playerOut")
+#    self.sourceOut = gst.element_factory_make("v4l2src", "camsrc")
+#    self.caps = gst.Caps("video/x-raw-yuv,width=320,height=240")
+      #^^ subject to later change^^
+
+#    self.filterOut = gst.element_factory_make("capsfilter", "filter")
+#    self.filterOut.set_property("caps", self.caps)
+      #^^ note: assuming this is dynamic,and that changing caps    ^^
+      #^^ properties later will propogate -- check this assumption ^^
+
+#    self.theoEnc = gst.element_factory_make("theoraenc", "theoenc")
+#    self.oggmuxer = gst.element_factory_make("oggmux", "oggmuxer")
+
+#    self.sinkOut = gst.element_factory_make("tcpclientsink", "sinkOut")
+      # this should be a UDP port, but... patience grasshopper
+
+#    self.conv = gst.element_factory_make ("ffmpegcolorspace", "conv")
+#    self.playerOut.add(self.sourceOut, self.filterOut, self.theoEnc, 
+#                       self.oggmuxer, self.sinkOut)
+#    gst.element_link_many(self.sourceOut, self.filterOut, 
+#                          self.theoEnc, self.oggmuxer, self.sinkOut)
+
+#    self.busOut = self.playerOut.get_bus()
+#    self.busOut.add_signal_watch()
+#    self.busOut.connect("message", self.busOut_on_message)
 #-----------------------------------
 ############## stop  OUT snippy  ##########################
 #(don't delete below yet, need to "steal" synch-messaging))
@@ -151,13 +210,12 @@ class thing1:
 #--end __init__ ---------------------------------
   def configurePipeInbound(self):
 	  # -- changed to only set, not create
-#      self.sourceIn.set_property("host", '127.0.0.1' )
-      self.sourceIn.set_property("host", Alice.localIP )
-#      self.sourceIn.set_property("host", '192.168.1.142' )
+#      self.sourceIn.set_property("host", Alice.localIP )
+#^^ remmed out for udptesting^^
       #this should be "Alice's" IP address
 
       self.sourceIn.set_property("port", 9000 )
-      #this should be "Bob's" listening port
+      #this should be "Alice's" listening port
 #-----------------------------------
   def configurePipeOutbound(self):
 # changed to only set, not create
@@ -166,6 +224,8 @@ class thing1:
 # should probably do caps setting here, rather than in __init__, but... 
 # it needs to be in __init__ too, it seems.
 
+      self.smokeEnc.set_property("keyframe", 8)
+      self.smokeEnc.set_property("qmax", 40)
 #      self.sinkOut.set_property("host", '127.0.0.1' ) 
       self.sinkOut.set_property("host", Bob.localIP)
 #      self.sinkOut.set_property("host", '192.168.1.101') 
